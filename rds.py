@@ -96,7 +96,9 @@ def fetch_company_data():
     try:
         response = requests.get(BASE_URL_ENTITIES, headers=HEADERS)
         response.raise_for_status()
-        return response.json().get("entities", [])
+        data = response.json()
+        logging.info(f"Fetched {len(data.get('entities', []))} companies from the API.")
+        return data.get("entities", [])
     except Exception as e:
         logging.error(f"Error fetching company data: {e}")
         return []
@@ -106,7 +108,9 @@ def fetch_articles_for_company(pb_id):
         url = BASE_URL_NEWS.format(pb_id)
         response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
-        return response.json().get("articles", [])
+        data = response.json()
+        logging.info(f"Fetched {len(data.get('articles', []))} articles for PB_ID {pb_id}.")
+        return data.get("articles", [])
     except Exception as e:
         logging.error(f"Error fetching articles for PB_ID {pb_id}: {e}")
         return []
@@ -252,6 +256,10 @@ def main():
     create_tables(conn)
 
     companies = fetch_company_data()
+    if not companies:
+        logging.error("No companies fetched. Exiting.")
+        return
+
     for company in companies:
         company_name = company.get("name")
         ticker = company.get("ticker", "Unknown")
@@ -260,6 +268,10 @@ def main():
         insert_into_company_table(conn, company_name, ticker, pb_id)
 
         articles = fetch_articles_for_company(pb_id)
+        if not articles:
+            logging.warning(f"No articles found for PB_ID {pb_id}. Skipping...")
+            continue
+
         for article in articles:
             url = article.get("url")
             article_data = scrape_with_playwright(url)
